@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" href="styles-stats.css" />
+  <title>Spotistats – Your Stats</title>
+</head>
+<body>
+  <a href="index.html"><img src="images/spotistats-logo.png" alt="Spotistats Logo" class="logo" /></a>
+  <h1>Your Top Tracks</h1>
+  <div class="carousel-wrapper">
+    <button class="play-btn left"><span class="arrow"></span></button>
+    <button class="play-btn right"><span class="arrow"></span></button>
+    <div class="carousel" id="top-tracks-list"></div>
+  </div>
+  <h1>Your Top Artists</h1>
+  <div class="carousel-wrapper">
+    <button class="play-btn left"><span class="arrow"></span></button>
+    <button class="play-btn right"><span class="arrow"></span></button>
+    <div class="carousel" id="top-artists-list"></div>
+  </div>
+  <h1>Recently Played</h1>
+  <div class="carousel-wrapper">
+    <button class="play-btn left"><span class="arrow"></span></button>
+    <button class="play-btn right"><span class="arrow"></span></button>
+    <div class="carousel" id="recently-played-list"></div>
+  </div>
+  <script>
+    const API_URL = "http://127.0.0.1:8888";
+    const token = window.location.hash.slice(1);
+
+    async function fetchAndDisplay(endpoint, containerId, formatter) {
+      const container = document.getElementById(containerId);
+      if (!token) {
+        container.innerHTML = `<p class="error">Please <a href="index.html">log in</a>.</p>`;
+        return;
+      }
+      try {
+        const res = await fetch(`${API_URL}/${endpoint}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.status === 401) return (window.location.href = "index.html");
+        const data = await res.json();
+        container.innerHTML = data.items.map(formatter).join("");
+      } catch (e) {
+        console.error(e);
+        container.innerHTML = `<p class="error">${e.message}</p>`;
+      }
+    }
+
+    (async () => {
+      await fetchAndDisplay(
+        "top",
+        "top-tracks-list",
+        (track) => `
+        <div class="card-item">
+          <img src="${track.album.images[1].url}" alt="Album cover" />
+          <div class="card-text">
+            <strong>${track.name}</strong>
+            <small>${track.artists[0].name}</small>
+          </div>
+        </div>
+      `
+      );
+
+      await fetchAndDisplay(
+        "top-artists",
+        "top-artists-list",
+        (artist) => `
+        <div class="card-item">
+          <img src="${artist.images[1].url}" alt="${artist.name}" />
+          <div class="card-text">
+            <strong>${artist.name}</strong>
+          </div>
+        </div>
+      `
+      );
+
+      await fetchAndDisplay(
+        "recently-played",
+        "recently-played-list",
+        (item) => {
+          const playedAt = new Date(item.played_at);
+          const time = playedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+          const date = playedAt.toLocaleDateString();
+          return `
+          <div class="card-item">
+            <img src="${item.track.album.images[1].url}" alt="Album cover" />
+            <div class="card-text">
+              <strong>${item.track.name}</strong>
+              <small>${item.track.artists[0].name}</small>
+              <small>Écouté à ${time} le ${date}</small>
+            </div>
+          </div>
+        `;
+        }
+      );
+    })();
+
+    function scrollByCard(carousel, direction = 1) {
+      const card = carousel.querySelector(".card-item");
+      if (!card) return;
+      const cardWidth = card.getBoundingClientRect().width;
+      const gap = parseFloat(getComputedStyle(carousel).gap) || 16;
+      const amount = (cardWidth + gap) * direction;
+      carousel.scrollBy({ left: amount, behavior: "smooth" });
+    }
+
+    document.querySelectorAll(".carousel-wrapper").forEach((wrapper) => {
+      const carousel = wrapper.querySelector(".carousel");
+      const leftBtn = wrapper.querySelector(".play-btn.left");
+      const rightBtn = wrapper.querySelector(".play-btn.right");
+      leftBtn.addEventListener("click", () => scrollByCard(carousel, -1));
+      rightBtn.addEventListener("click", () => scrollByCard(carousel, 1));
+      const updateButtons = () => {
+        leftBtn.disabled = carousel.scrollLeft <= 0;
+        rightBtn.disabled = Math.ceil(carousel.scrollLeft + carousel.clientWidth) >= carousel.scrollWidth;
+      };
+      carousel.addEventListener("scroll", updateButtons);
+      window.addEventListener("resize", updateButtons);
+      setTimeout(updateButtons, 100);
+    });
+  </script>
+</body>
+</html>
